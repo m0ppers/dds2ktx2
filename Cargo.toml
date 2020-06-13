@@ -1,0 +1,13 @@
+[package]
+name = "dds2ktx2"
+version = "0.1.0"
+authors = ["Andreas Streichardt <andreas@mop.koeln>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ddsfile = "0.4.0"
+vk-sys = "0.5.2"
+byteorder = "1.3.4"
+structopt = "0.3.14"
