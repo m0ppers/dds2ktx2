@@ -6,6 +6,22 @@ use crate::ktx2::KTX2;
 use ddsfile::Caps2;
 use ddsfile::Dds;
 
+pub fn dds_format2ktx2_format(format: ddsfile::DxgiFormat) -> Option<u32> {
+    match format {
+        ddsfile::DxgiFormat::R16G16B16A16_Float => Some(vk_sys::FORMAT_R16G16B16A16_SFLOAT),
+        ddsfile::DxgiFormat::R11G11B10_Float => Some(vk_sys::FORMAT_B10G11R11_UFLOAT_PACK32),
+        _ => None,
+    }
+}
+
+pub fn pixel_size(format: u32) -> Option<u32> {
+    match format {
+        vk_sys::FORMAT_R16G16B16A16_SFLOAT => Some(8),
+        vk_sys::FORMAT_B10G11R11_UFLOAT_PACK32 => Some(4),
+        _ => None,
+    }
+}
+
 pub fn convert<I: Read, O: Write>(reader: &mut I, writer: &mut O) -> Result<(), Box<dyn Error>> {
     let mut dds = Dds::read(reader)?;
 
@@ -18,9 +34,9 @@ pub fn convert<I: Read, O: Write>(reader: &mut I, writer: &mut O) -> Result<(), 
         None => panic!("DDS not in dxgi format"),
     };
 
-    let vk_format = match format {
-        ddsfile::DxgiFormat::R16G16B16A16_Float => vk_sys::FORMAT_R16G16B16A16_SFLOAT,
-        _ => panic!("Unsupported format. Only R16G16B16A16_Float supported"),
+    let vk_format = match dds_format2ktx2_format(format) {
+        Some(vk_format) => vk_format,
+        None => panic!("Unsupported format. Only R16G16B16A16_Float supported"),
     };
 
     let width_base = (dds.get_width() as f32).log2();
@@ -41,6 +57,9 @@ pub fn convert<I: Read, O: Write>(reader: &mut I, writer: &mut O) -> Result<(), 
         .vk_format(vk_format)
         .face_count(6);
 
+    let pixel_size =
+        pixel_size(vk_format).expect(&format!("no pixel_size known for {}", vk_format));
+
     // dds is organized like this: face x in all mips, face -x in all mips...etc.
     // ktx2 is organized like this: mip 1 with all faces, mip2 with all faces etc.
     let level_size = dds.get_mut_data(0).unwrap().len();
@@ -49,7 +68,7 @@ pub fn convert<I: Read, O: Write>(reader: &mut I, writer: &mut O) -> Result<(), 
         let divisor = 1 << level_index;
         let level_width = dds.get_width() / divisor;
         let level_height = dds.get_height() / divisor;
-        let face_size = level_width * level_height * 8;
+        let face_size = level_width * level_height * pixel_size;
 
         let mut level_data = vec![];
         for face_index in 0..6 {
